@@ -12,7 +12,7 @@ on:
         required: true
 
 permissions:
-  contents: write
+  contents: read
   deployments: write
 
 jobs:
@@ -50,8 +50,6 @@ jobs:
           fi
           echo "Deployment id: $DEPLOYMENT_ID"
           echo "deployment_id=$DEPLOYMENT_ID" >> "$GITHUB_OUTPUT"
-
-
 
       - name: Download vehicle artifact
         uses: actions/download-artifact@v7
