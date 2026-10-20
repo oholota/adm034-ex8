@@ -7,6 +7,12 @@ on:
         description: Name of the vehicle to deploy (car, motorbike, or truck)
         type: string
         required: true
+      fail_vehicle:
+        description: Which vehicle should fail its health check
+        type: string
+        required: false
+        default: none
+
     secrets:
       DEPLOY_TOKEN:
         required: true
