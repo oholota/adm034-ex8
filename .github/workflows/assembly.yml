@@ -4,6 +4,17 @@ on:
   push:
     branches: [master]
   workflow_dispatch:
+    inputs:
+      fail_vehicle:
+        description: 'Which vehicle should fail its health check'
+        type: choice
+        options:
+          - none
+          - car
+          - motorbike
+          - truck
+        default: none
+
 
 permissions:
   contents: read
