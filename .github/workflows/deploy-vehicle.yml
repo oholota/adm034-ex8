@@ -22,6 +22,26 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Create deployment
+        id: create_deployment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          VEHICLE: ${{ inputs.vehicle_name }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          BODY=$(jq -n \
+            --arg ref "$SHA" \
+            --arg env "production-$VEHICLE" \
+            --arg desc "Deploy $VEHICLE from run #$RUN_NUMBER" \
+            '{ref: $ref, environment: $env, description: $desc,
+              required_contexts: ["ci/full-suite"]}')
+          echo "Request body:"
+          echo "$BODY"
+          printf '%s' "$BODY" | gh api "repos/$REPO/deployments" --method POST --input -
+
+
       - name: Download vehicle artifact
         uses: actions/download-artifact@v7
         with:
