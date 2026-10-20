@@ -11,6 +11,10 @@ on:
       DEPLOY_TOKEN:
         required: true
 
+permissions:
+  contents: read
+  deployments: write
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
