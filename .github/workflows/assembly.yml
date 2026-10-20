@@ -1,4 +1,5 @@
 name: Vehicle Assembly
+run-name: "Assembly #${{ github.run_number }} - fail_vehicle=${{ inputs.fail_vehicle }}"
 
 on:
   push:
