@@ -12,7 +12,7 @@ on:
         required: true
 
 permissions:
-  contents: read
+  contents: write
   deployments: write
 
 jobs:
@@ -36,10 +36,21 @@ jobs:
             --arg env "production-$VEHICLE" \
             --arg desc "Deploy $VEHICLE from run #$RUN_NUMBER" \
             '{ref: $ref, environment: $env, description: $desc,
-              required_contexts: ["ci/full-suite"]}')
+              auto_merge: false, required_contexts: []}')
           echo "Request body:"
           echo "$BODY"
-          printf '%s' "$BODY" | gh api "repos/$REPO/deployments" --method POST --input -
+          RESPONSE=$(printf '%s' "$BODY" | gh api "repos/$REPO/deployments" \
+            --method POST --input - 2>&1) || true
+          echo "Response:"
+          echo "$RESPONSE"
+          DEPLOYMENT_ID=$(printf '%s' "$RESPONSE" | jq -r '.id // empty')
+          if [ -z "$DEPLOYMENT_ID" ]; then
+            echo "::error title=Deployment not created::No id in the API response"
+            exit 1
+          fi
+          echo "Deployment id: $DEPLOYMENT_ID"
+          echo "deployment_id=$DEPLOYMENT_ID" >> "$GITHUB_OUTPUT"
+
 
 
       - name: Download vehicle artifact
