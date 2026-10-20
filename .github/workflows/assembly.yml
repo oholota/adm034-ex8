@@ -5,6 +5,10 @@ on:
     branches: [master]
   workflow_dispatch:
 
+permissions:
+  contents: read
+  deployments: write
+
 concurrency:
   group: ${{ github.ref }}
   cancel-in-progress: true
