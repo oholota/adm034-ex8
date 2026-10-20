@@ -357,3 +357,42 @@ jobs:
       fail_vehicle: ${{ inputs.fail_vehicle }}
     secrets:
       DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+
+
+  deployment_report:
+    needs: [deploy_car, deploy_motorbike, deploy_truck]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build the deployment dashboard
+        env:
+          CAR: ${{ needs.deploy_car.result }}
+          MOTORBIKE: ${{ needs.deploy_motorbike.result }}
+          TRUCK: ${{ needs.deploy_truck.result }}
+          FAIL_VEHICLE: ${{ inputs.fail_vehicle }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          icon() {
+            case "$1" in
+              success) echo "PASSED" ;;
+              failure) echo "FAILED" ;;
+              skipped) echo "SKIPPED" ;;
+              *) echo "$1" ;;
+            esac
+          }
+          {
+            echo "## Deployment report"
+            echo ""
+            echo "Run: [#${GITHUB_RUN_NUMBER}]($RUN_URL) | Triggered by: @${GITHUB_ACTOR}"
+            echo "Failure injected into: \`${FAIL_VEHICLE:-none}\`"
+            echo ""
+            echo "| Vehicle | Environment | Result |"
+            echo "|---------|-------------|--------|"
+            echo "| car | production-car | $(icon "$CAR") |"
+            echo "| motorbike | production-motorbike | $(icon "$MOTORBIKE") |"
+            echo "| truck | production-truck | $(icon "$TRUCK") |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$CAR" = "failure" ] || [ "$MOTORBIKE" = "failure" ] || [ "$TRUCK" = "failure" ]; then
+            echo "::error title=Partial rollout::At least one vehicle failed to deploy while others succeeded"
+          fi
