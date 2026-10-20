@@ -282,6 +282,52 @@ jobs:
           echo "Runner OS: ${{ runner.os }}"
           echo "Run number: ${{ github.run_number }}"
 
+  monitor:
+    needs: [test_car, test_motorbike, test_truck]
+    if: always()
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 10
+    permissions:
+      deployments: read
+    steps:
+      - name: Watch the rollout
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          for poll in $(seq 1 20); do
+            echo "::group::Poll $poll"
+            printf '%-24s %-14s %s\n' "ENVIRONMENT" "STATE" "DEPLOYMENT"
+            FINAL=0
+            for vehicle in car motorbike truck; do
+              ID=$(gh api "repos/$REPO/deployments?environment=production-$vehicle&sha=$SHA" \
+                     | jq -r --arg d "run #$RUN_NUMBER" \
+                         'map(select(.description | endswith($d))) | .[0].id // empty')
+              if [ -z "$ID" ]; then
+                STATE="not created"
+                ID="-"
+              else
+                STATE=$(gh api "repos/$REPO/deployments/$ID/statuses" \
+                          --jq '.[0].state // "pending"')
+              fi
+              case "$STATE" in
+                success|failure|error|inactive) FINAL=$((FINAL + 1)) ;;
+              esac
+              printf '%-24s %-14s %s\n' "production-$vehicle" "$STATE" "$ID"
+            done
+            echo "::endgroup::"
+            if [ "$FINAL" -eq 3 ]; then
+              echo "All three deployments reached a final state after $poll polls"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::warning title=Monitor timed out::Not all deployments finished within 20 polls"
+
+
   deploy_car:
     needs: test_car
     if: github.ref_name == 'main' || github.ref_name == 'master'
