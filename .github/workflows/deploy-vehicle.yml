@@ -82,9 +82,39 @@ jobs:
           token: ${{ secrets.DEPLOY_TOKEN }}
 
       - name: Deploy vehicle
+        env:
+          VEHICLE: ${{ inputs.vehicle_name }}
+          FAIL_VEHICLE: ${{ inputs.fail_vehicle }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
         run: |
-          echo "Deploying ${{ inputs.vehicle_name }} to production"
-          cat build/${{ inputs.vehicle_name }}.txt
+          echo "Deploying $VEHICLE to production"
+          cat "build/$VEHICLE.txt"
+
+          if [ "$VEHICLE" = "$FAIL_VEHICLE" ]; then
+            HEALTH_FILE=".github/workflows/assembly-$VEHICLE-broken.yml"
+          else
+            HEALTH_FILE=".github/workflows/assembly.yml"
+          fi
+          URL="https://raw.githubusercontent.com/$REPO/$BRANCH/$HEALTH_FILE"
+          echo "Health endpoint for $VEHICLE: $URL"
+
+          for attempt in 1 2 3; do
+            echo "::group::Health check attempt $attempt of 3"
+            if curl --fail --silent --show-error --max-time 20 \
+                 --output /dev/null "$URL"; then
+              echo "$VEHICLE is healthy"
+              echo "::endgroup::"
+              exit 0
+            fi
+            echo "::warning title=Health check failed::$VEHICLE attempt $attempt returned an error"
+            echo "::endgroup::"
+            sleep 5
+          done
+
+          echo "::error title=Deployment unhealthy::$VEHICLE failed all 3 health checks"
+          exit 1
+
 
       - name: Upload failure artifact
         if: failure()
