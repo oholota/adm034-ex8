@@ -50,6 +50,19 @@ jobs:
           fi
           echo "Deployment id: $DEPLOYMENT_ID"
           echo "deployment_id=$DEPLOYMENT_ID" >> "$GITHUB_OUTPUT"
+          
+      - name: Mark deployment in progress
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          DEPLOYMENT_ID: ${{ steps.create_deployment.outputs.deployment_id }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          jq -n --arg log "$RUN_URL" \
+            '{state: "in_progress", log_url: $log, description: "Rollout started"}' \
+            | gh api "repos/$REPO/deployments/$DEPLOYMENT_ID/statuses" \
+                --method POST --input - --jq '.state'
+
 
       - name: Download vehicle artifact
         uses: actions/download-artifact@v7
@@ -78,3 +91,34 @@ jobs:
       - name: Deployment complete
         if: always()
         run: echo "Deployment attempt complete for ${{ inputs.vehicle_name }}"
+
+      - name: Mark deployment successful
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          DEPLOYMENT_ID: ${{ steps.create_deployment.outputs.deployment_id }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          VEHICLE: ${{ inputs.vehicle_name }}
+        run: |
+          jq -n --arg log "$RUN_URL" --arg env "https://example.invalid/$VEHICLE" \
+            '{state: "success", log_url: $log, environment_url: $env,
+              description: "Rollout finished"}' \
+            | gh api "repos/$REPO/deployments/$DEPLOYMENT_ID/statuses" \
+                --method POST --input - --jq '.state'
+
+      - name: Mark deployment failed
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          DEPLOYMENT_ID: ${{ steps.create_deployment.outputs.deployment_id }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          jq -n --arg log "$RUN_URL" \
+            '{state: "failure", log_url: $log, description: "Rollout failed"}' \
+            | gh api "repos/$REPO/deployments/$DEPLOYMENT_ID/statuses" \
+                --method POST --input - --jq '.state'
+
+
+
